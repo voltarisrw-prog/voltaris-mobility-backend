@@ -43,6 +43,21 @@ class Settings(BaseSettings):
     login_max_attempts: int = 5
     login_lockout_seconds: int = 900
 
+    #: SameSite policy for the session cookies.
+    #:
+    #: "lax" is correct when the frontend and API share a registrable domain —
+    #: voltaris.rw and api.voltaris.rw are the same site, and Lax still blocks
+    #: the cross-site POSTs that CSRF depends on.
+    #:
+    #: "none" is required when they do not, as with a *.vercel.app frontend
+    #: calling a *.onrender.com API. Lax cookies are not sent on cross-site
+    #: fetch, so login would appear to succeed and the next request would arrive
+    #: anonymous, with nothing in any log to explain it.
+    #:
+    #: "none" demands Secure, so it only works over HTTPS. The CSRF double-submit
+    #: token carries the protection Lax was providing.
+    session_cookie_samesite: Literal["lax", "none", "strict"] = "lax"
+
     # --- Google sign-in ---------------------------------------------------
     # Blank client id disables the feature: the endpoints return NOT_CONFIGURED
     # rather than pretending to work.

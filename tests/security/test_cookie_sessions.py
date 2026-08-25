@@ -136,3 +136,30 @@ async def test_session_endpoint_returns_the_wrapped_shape_the_frontend_expects(a
     assert body["user"]["email"] == "shape@example.com"
     assert body["user"]["full_name"] == "Test Person"
     assert body["user"]["roles"] == ["BUYER"]
+
+
+def test_no_cookie_hardcodes_its_samesite_policy():
+    """All three session cookies must read SESSION_COOKIE_SAMESITE.
+
+    A patch once updated two of the three and left the session cookie on a
+    hardcoded 'lax'. The symptom is brutal to diagnose: login returns 200, the
+    cookie is set, and the next cross-site request arrives anonymous with
+    nothing in any log to explain it.
+    """
+    import pathlib
+
+    source = (
+        pathlib.Path(__file__).resolve().parents[2] / "app" / "core" / "sessions.py"
+    ).read_text()
+    assert 'samesite="lax"' not in source, "a cookie hardcodes SameSite"
+    assert source.count("samesite=same_site") == 3, "all three cookies must use the setting"
+
+
+def test_samesite_none_forces_secure():
+    """Browsers reject SameSite=None without Secure, so it cannot be optional."""
+    import pathlib
+
+    source = (
+        pathlib.Path(__file__).resolve().parents[2] / "app" / "core" / "sessions.py"
+    ).read_text()
+    assert 'same_site == "none"' in source, "Secure must be forced when SameSite is None"

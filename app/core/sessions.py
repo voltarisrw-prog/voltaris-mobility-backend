@@ -36,7 +36,10 @@ MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 def set_session_cookies(response: Response, *, access: str, refresh: str) -> str:
     """Attach the session to the response and return the CSRF token."""
     settings = get_settings()
-    secure = settings.is_production
+    same_site = settings.session_cookie_samesite
+    # SameSite=None is meaningless without Secure and browsers reject the pair,
+    # so it forces HTTPS regardless of environment.
+    secure = settings.is_production or same_site == "none"
     csrf = secrets.token_urlsafe(24)
 
     response.set_cookie(
@@ -44,10 +47,11 @@ def set_session_cookies(response: Response, *, access: str, refresh: str) -> str
         access,
         httponly=True,
         secure=secure,
-        # Lax, not Strict: Strict drops the cookie on the return leg of the Google
-        # OAuth redirect, so the user lands signed-out immediately after signing in.
-        # Lax still blocks cross-site POSTs, which is the case that matters.
-        samesite="lax",
+        # Never Strict: it drops the cookie on the return leg of the Google OAuth
+        # redirect, landing the user signed-out immediately after signing in.
+        # Lax by default; None when the frontend is on a different registrable
+        # domain. SESSION_COOKIE_SAMESITE controls it.
+        samesite=same_site,
         max_age=settings.access_token_ttl_seconds,
         path="/",
     )
@@ -56,7 +60,7 @@ def set_session_cookies(response: Response, *, access: str, refresh: str) -> str
         refresh,
         httponly=True,
         secure=secure,
-        samesite="lax",
+        samesite=same_site,
         max_age=settings.refresh_token_ttl_seconds,
         path=REFRESH_PATH,
     )
@@ -67,7 +71,7 @@ def set_session_cookies(response: Response, *, access: str, refresh: str) -> str
         # cross-site attacker cannot do because it cannot read the cookie.
         httponly=False,
         secure=secure,
-        samesite="lax",
+        samesite=same_site,
         max_age=settings.refresh_token_ttl_seconds,
         path="/",
     )
