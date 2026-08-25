@@ -35,10 +35,40 @@ from app.infrastructure.database.indexes import ensure_indexes
 logger = logging.getLogger("voltaris.api")
 
 
+def _init_error_tracking(settings: Any) -> None:
+    """Wire Sentry when a DSN is configured.
+
+    Without this an exception in production is visible only to whoever happens to
+    read container logs. `send_default_pii=False` is the important argument: the
+    default would attach request bodies and headers to every event, which for
+    this app means shipping passwords and session cookies to a third party.
+    """
+    if not settings.sentry_dsn:
+        return
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+    except ImportError:
+        logger.warning("SENTRY_DSN is set but sentry-sdk is not installed")
+        return
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        send_default_pii=False,
+        # 10% of transactions. Enough to see latency trends without paying to
+        # trace every health check.
+        traces_sample_rate=0.1,
+        integrations=[FastApiIntegration()],
+    )
+    logger.info("error tracking enabled")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
+    _init_error_tracking(settings)
     await connect()
 
     # A database that is not up yet must not kill the process.
@@ -196,7 +226,18 @@ def create_app() -> FastAPI:
     async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
         request_id = request_id_var.get()
         logger.exception("unhandled error", extra={"endpoint": request.url.path})
-        _ = exc
+        if settings.sentry_dsn:
+            try:
+                import sentry_sdk
+
+                # Tag with the request id so a Sentry event and a log line can be
+                # matched without guesswork.
+                sentry_sdk.set_tag("request_id", request_id)
+                sentry_sdk.capture_exception(exc)
+            except Exception:
+                # Reporting must never mask the error it is reporting. Logged at
+                # debug so a broken Sentry does not itself fill the log.
+                logger.debug("could not report to sentry", exc_info=True)
         return JSONResponse(
             status_code=500,
             content=error_body(ErrorCode.INTERNAL_ERROR, request_id),

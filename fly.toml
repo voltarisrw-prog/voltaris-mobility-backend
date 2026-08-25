@@ -1,0 +1,57 @@
+# Fly.io deployment for the Voltaris API.
+#
+# Region: jnb (Johannesburg).
+#
+# This is the decision worth explaining. Fly has no African region closer to
+# Kigali, and jnb is roughly 60-80ms away where Frankfurt or London is 150-190ms.
+# Every API call the frontend makes pays that round trip, and server-rendered
+# pages pay it before the user sees anything. Hosting in Europe because the
+# tooling defaults there would make the site measurably slower for the people it
+# is for.
+#
+#   fly launch --no-deploy       (first time — creates the app)
+#   fly secrets set ...          (see DEPLOYMENT.md)
+#   fly deploy
+
+app = "voltaris-api"
+primary_region = "jnb"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ENVIRONMENT = "production"
+  MONGODB_DATABASE = "voltaris"
+  LOG_LEVEL = "INFO"
+  # Everything secret arrives via `fly secrets`, never here — this file is in git.
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # One machine always warm. Scaling to zero would mean the first visitor of the
+  # morning waits for a cold start plus an Atlas handshake.
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 80
+    hard_limit = 120
+
+  # Readiness, not liveness. /readyz reports degraded when Mongo is unreachable,
+  # so a database outage drains this instance instead of serving errors.
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "4s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/readyz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # 512MB is too tight: Pillow decoding a 12MB photo into 50M pixels needs
+  # headroom, and being OOM-killed mid-upload loses the seller's work.
+  memory = "1gb"
+  cpus = 1

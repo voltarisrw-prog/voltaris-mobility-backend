@@ -1,0 +1,50 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Fly
+    runs-on: ubuntu-latest
+    # A GitHub environment with a required reviewer. Nothing reaches production
+    # without someone approving it.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # The full suite runs again here rather than trusting the CI workflow's
+      # result: a green check on an older commit is not evidence about this one.
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check app tests scripts
+      - run: pytest tests/unit tests/api tests/security -q
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only --wait-timeout 300
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # Deploying is not the same as working. The smoke test exercises the real
+      # HTTP surface against production and fails the job if anything is wrong.
+      - name: Smoke test production
+        run: python scripts/smoke.py "${{ vars.PRODUCTION_URL }}"
+
+      - name: Roll back on failure
+        if: failure()
+        run: |
+          echo "Smoke test failed. Rolling back to the previous release."
+          flyctl releases --json | python -c "import json,sys;print(json.load(sys.stdin)[1]['Version'])" \
+            | xargs -I{} flyctl deploy --image-label v{}
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
