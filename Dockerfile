@@ -37,12 +37,27 @@ COPY --chown=voltaris:voltaris app ./app
 COPY --chown=voltaris:voltaris scripts ./scripts
 
 USER voltaris
+# Documentation only. The actual port comes from $PORT at run time, because
+# Render, Cloud Run and Railway all inject it and route traffic there — a
+# hardcoded port means the platform health check finds nothing listening.
+ENV PORT=8000
 EXPOSE 8000
 
 # Liveness only — readiness is polled by the orchestrator, and a slow database
 # must not cause a healthy container to be restarted.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=2).status==200 else 1)"
+    CMD python -c "import os,urllib.request,sys; sys.exit(0 if urllib.request.urlopen(f\"http://127.0.0.1:{os.environ.get('PORT','8000')}/healthz\",timeout=2).status==200 else 1)"
 
 # No secrets baked in; every one arrives from the environment at run time.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-server-header"]
+# Shell form on purpose: $PORT and $WEB_CONCURRENCY have to be expanded at run
+# time, and exec form does not run a shell. `exec` keeps uvicorn as PID 1 so it
+# still receives SIGTERM and shuts down cleanly instead of being killed.
+#
+# WEB_CONCURRENCY defaults to 1. Each worker loads the whole application, and on
+# a 512MB instance two workers plus Pillow decoding a 12MB photo is an OOM kill.
+# Raise it once the instance has the memory to justify it.
+CMD exec uvicorn app.main:app \
+    --host 0.0.0.0 \
+    --port "${PORT:-8000}" \
+    --workers "${WEB_CONCURRENCY:-1}" \
+    --no-server-header
