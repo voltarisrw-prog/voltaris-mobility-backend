@@ -14,7 +14,10 @@ logger = logging.getLogger("voltaris.ops")
 router = APIRouter(tags=["ops"])
 
 
-@router.get("/", include_in_schema=False)
+# HEAD as well as GET. Uptime monitors and Render's own probe use HEAD, and a
+# GET-only route answers them with 405 — which reads as "the service is broken"
+# on a dashboard that only shows the status code.
+@router.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 async def root() -> dict[str, Any]:
     """A signpost, not a 404.
 
@@ -38,14 +41,14 @@ async def root() -> dict[str, Any]:
     }
 
 
-@router.get("/healthz")
+@router.api_route("/healthz", methods=["GET", "HEAD"])
 async def liveness() -> dict[str, str]:
     """Is the process up. Must not touch the database — a slow Mongo would otherwise
     cause the orchestrator to kill healthy pods."""
     return {"status": "ok", "service": get_settings().service_name}
 
 
-@router.get("/readyz")
+@router.api_route("/readyz", methods=["GET", "HEAD"])
 async def readiness(request: Request, db: DbDep) -> dict[str, Any]:
     """Can this instance serve traffic. Does touch the database, deliberately.
 

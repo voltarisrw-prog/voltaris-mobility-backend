@@ -64,3 +64,14 @@ def test_dev_script_rebuilds_and_waits():
 def test_seed_refuses_production():
     source = (ROOT / "scripts" / "seed.py").read_text()
     assert "refusing to seed a production database" in source
+
+
+def test_probe_endpoints_answer_head_as_well_as_get():
+    """Render and most uptime monitors probe with HEAD.
+
+    A GET-only route replies 405, which on a status-code dashboard is
+    indistinguishable from the service being broken.
+    """
+    source = (ROOT / "app" / "api" / "v1" / "routes" / "health.py").read_text()
+    for path in ('"/"', '"/healthz"', '"/readyz"'):
+        assert f'api_route({path}, methods=["GET", "HEAD"]' in source, f"{path} is GET-only"
