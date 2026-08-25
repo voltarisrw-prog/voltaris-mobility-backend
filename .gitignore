@@ -8,3 +8,6 @@ __pycache__/
 .env.*
 !.env.example
 *.egg-info/
+
+# Written by scripts/reset_password.py --write-file. Test credentials.
+credentials.local.txt
