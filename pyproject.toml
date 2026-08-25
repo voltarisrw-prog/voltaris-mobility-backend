@@ -1,0 +1,40 @@
+[project]
+name = "voltaris-api"
+version = "1.0.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "ASYNC", "C4", "SIM", "RUF"]
+ignore = ["S101", "B008"]  # asserts are used as invariants; B008 is FastAPI's Depends idiom
+
+[tool.ruff.lint.per-file-ignores]
+# S105/S106/S107 flag string literals that look like credentials. Here they are
+# token-type discriminators ("access"/"refresh") and ErrorCode names, none of which
+# are secrets. Scoped to the files where that pattern legitimately appears.
+"app/core/security.py" = ["S105", "S106"]
+"app/core/errors.py" = ["S105"]
+# google_token_url is a public endpoint, not a secret.
+"app/core/config.py" = ["S105"]
+"app/modules/auth/service.py" = ["S106"]
+"app/api/deps.py" = ["S105", "S106"]
+"tests/*" = ["S105", "S106", "S107", "S311"]
+# Throwaway credentials generated per run against a development database.
+"scripts/smoke.py" = ["S105", "S106"]
+"scripts/seed.py" = ["S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+plugins = []
+
+[[tool.mypy.overrides]]
+module = ["mongomock_motor.*", "motor.*", "pymongo.*"]
+ignore_missing_imports = true

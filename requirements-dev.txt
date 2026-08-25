@@ -1,0 +1,22 @@
+# Development and CI only. Never installed into the production image.
+-r requirements.txt
+
+# uvicorn --reload refuses to start without watchfiles.
+Pygments==2.21.0
+ast_serialize==0.8.0
+iniconfig==2.3.0
+librt==0.15.0
+mongomock-motor==0.0.36
+mongomock==4.3.0
+mypy==2.3.1
+mypy_extensions==1.1.0
+packaging==26.3
+pathspec==1.1.1
+pluggy==1.6.0
+pytest-asyncio==1.4.0
+pytest==9.1.1
+pytz==2026.3.post1
+ruff==0.16.4
+sentinels==1.1.1
+watchfiles==1.2.0
+piexif==1.1.3

@@ -1,0 +1,68 @@
+# Default stack: the API only, reading configuration from your .env.
+#
+#   docker compose up --watch
+#
+# This is the right shape when MONGODB_URI points at Atlas or any external
+# database. To run a throwaway MongoDB alongside it, add the local-db overlay:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local-db.yml up --watch
+
+services:
+  api:
+    build: .
+    ports: ['8000:8000']
+
+    # Read your .env from the host. `.env` is excluded from the image on purpose
+    # (secrets do not belong in a layer), so this is how it reaches the container.
+    env_file:
+      - path: .env
+        required: false
+
+    # Every value below is a FALLBACK. `${VAR:-default}` means anything set in
+    # your .env wins. Hardcoding literals here silently overrode a real Atlas
+    # URI, which is exactly the bug this shape prevents.
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI in .env — see .env.example}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-voltaris}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-not-for-any-real-use}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-local-webhook-secret}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000"]}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/auth/google/callback}
+
+    # The image CMD runs two workers with no reloader, which is right for
+    # production and useless locally. One worker plus --reload, since --reload
+    # and multiple workers conflict.
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8000'
+      - --reload
+      - --reload-dir
+      - /srv/app
+
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+    # `docker compose up --watch` (or pressing `w`) makes this live.
+    develop:
+      watch:
+        - action: sync
+          path: ./app
+          target: /srv/app
+          ignore:
+            - '**/__pycache__/'
+        # The virtualenv is baked into the builder stage, so a dependency change
+        # cannot be synced — it has to rebuild.
+        - action: rebuild
+          path: ./requirements.txt
+        - action: rebuild
+          path: ./Dockerfile

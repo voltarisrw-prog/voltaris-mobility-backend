@@ -1,0 +1,65 @@
+# Overlay: a local MongoDB replica set, for when you are not using Atlas.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local-db.yml up --watch
+#
+# A single-node replica set rather than a standalone, because multi-document
+# transactions require one and the local environment should match production
+# semantics.
+
+services:
+  api:
+    # Overrides the fallback in the base file. Anything in your .env still wins,
+    # so unset MONGODB_URI there when you want the container database.
+    environment:
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/?replicaSet=rs0}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7
+
+    # CRITICAL. Without this, the container's hostname is a random ID, and
+    # rs.initiate() bakes that ID into the replica set config stored on the
+    # volume. The next `docker compose up` gets a different ID, the node is no
+    # longer a member of its own replica set, transitions to REMOVED, and never
+    # elects a primary again — every read fails with ReadConcernMajorityNotAvailableYet.
+    # A stable hostname is what makes the config survive a container recreate.
+    hostname: mongo
+
+    command:
+      - --replSet
+      - rs0
+      - --bind_ip_all
+      # --quiet and the verbosity floor: the healthcheck spawns a full mongosh,
+      # which opens five connections per probe. At default INFO that buried the
+      # API's own request log under thousands of connection lines an hour.
+      - --quiet
+      - --setParameter
+      - logComponentVerbosity={"network":{"verbosity":-1},"accessControl":{"verbosity":-1}}
+
+    ports: ['27017:27017']
+    volumes: ['mongo-data:/data/db']
+
+    healthcheck:
+      # Initiates the set on first boot with an EXPLICIT member host, then just
+      # confirms it. Passing the config rather than letting Mongo infer it is the
+      # other half of the hostname fix — inference uses the container ID.
+      test: >-
+        mongosh --quiet --eval "
+          try { rs.status().ok }
+          catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok }
+        "
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+volumes:
+  mongo-data:
