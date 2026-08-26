@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
 
     # --- Database -----------------------------------------------------------
-    mongodb_uri: str = "mongodb://localhost:27017"
+    mongodb_uri: str = "mongodb+srv://voltarisrw_db_user:i1sDhybqWKY6fRSC@cluster0.gn8tuzc.mongodb.net"
     mongodb_database: str = "voltaris"
     mongodb_max_pool_size: int = 50
     mongodb_min_pool_size: int = 5
