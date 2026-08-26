@@ -1,21 +1,4 @@
 # Render deployment for the Voltaris API.
-#
-# Free tier, which is the right first step: it takes the existing Dockerfile
-# unchanged and costs nothing. Two limits worth knowing before you rely on it.
-#
-#   Sleeps after 15 minutes idle. The first request afterwards takes 30-60
-#   seconds while the container starts and reconnects to Atlas. Fine for a demo,
-#   wrong for a customer.
-#
-#   512MB RAM. Enough to serve the marketplace; not enough for two uvicorn
-#   workers, which is why WEB_CONCURRENCY is pinned to 1 below.
-#
-# Region: Frankfurt. Render has no African region, and Frankfurt is roughly
-# 150ms from Kigali against 230ms for Oregon or Virginia.
-#
-# When latency or the cold start starts to matter, Google Cloud Run has an
-# africa-south1 (Johannesburg) region, a generous free tier, and takes this same
-# Dockerfile. See LAUNCH.md.
 
 services:
   - type: web
@@ -30,49 +13,58 @@ services:
     envVars:
       - key: ENVIRONMENT
         value: production
+
       - key: LOG_LEVEL
         value: INFO
+
       - key: MONGODB_DATABASE
         value: voltaris
 
-      # One worker. See the note above and in the Dockerfile.
+      # One worker for Render's 512MB free tier.
       - key: WEB_CONCURRENCY
         value: "1"
 
-      # sync: false means Render prompts for the value and stores it encrypted,
-      # rather than reading it from this file. Nothing secret belongs in git.
+      # Secrets
       - key: MONGODB_URI
         sync: false
+
       - key: JWT_SECRET
-        # Render generates a strong value and keeps it. The app refuses to start
-        # in production with a short or placeholder secret, so this must be real.
         generateValue: true
+
       - key: PAYMENT_WEBHOOK_SECRET
         generateValue: true
 
-      # The exact frontend origin. A wildcard is rejected by the production
-      # config guard, and browsers reject it anyway for credentialed requests —
-      # which is every authenticated call this app makes.
+      # Frontend origins allowed to communicate with the API.
+      # No wildcard because authenticated requests use credentials/cookies.
       - key: CORS_ORIGINS
-        sync: false
+        value: '["https://voltaris-mobility-frontend.vercel.app","https://voltaris.rw"]'
 
-      # Optional. Leave unset and the features are cleanly disabled rather than
-      # half-working: uploads return NOT_CONFIGURED, Google sign-in is hidden.
+      # Optional Cloudflare R2 configuration.
       - key: R2_ACCOUNT_ID
         sync: false
+
       - key: R2_ACCESS_KEY_ID
         sync: false
+
       - key: R2_SECRET_ACCESS_KEY
         sync: false
+
       - key: R2_BUCKET
         sync: false
+
       - key: R2_PUBLIC_BASE_URL
         sync: false
+
+      # Google OAuth
       - key: GOOGLE_CLIENT_ID
         sync: false
+
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+
       - key: GOOGLE_REDIRECT_URI
         sync: false
+
+      # Optional monitoring
       - key: SENTRY_DSN
         sync: false
