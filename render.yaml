@@ -1,5 +1,3 @@
-# Render deployment for the Voltaris API.
-
 services:
   - type: web
     name: voltaris-api
@@ -20,17 +18,12 @@ services:
       - key: MONGODB_DATABASE
         value: voltaris
 
-<<<<<<< HEAD
-      # One worker for Render's 512MB free tier.
-=======
-      # Frontend is on vercel.app while API is on onrender.com.
-      # They are cross-site, so browser session cookies require SameSite=None.
-      # SameSite=None automatically forces Secure in app/core/sessions.py.
+      # Frontend (Vercel) and API (Render) are cross-site.
+      # Browser authentication cookies therefore require SameSite=None.
       - key: SESSION_COOKIE_SAMESITE
         value: none
 
-      # One worker. See the note above and in the Dockerfile.
->>>>>>> 371732f (changed mongodbURI)
+      # One worker for Render free tier.
       - key: WEB_CONCURRENCY
         value: "1"
 
@@ -44,12 +37,11 @@ services:
       - key: PAYMENT_WEBHOOK_SECRET
         generateValue: true
 
-      # Frontend origins allowed to communicate with the API.
-      # No wildcard because authenticated requests use credentials/cookies.
+      # Authenticated browser requests require credentials.
       - key: CORS_ORIGINS
         value: '["https://voltaris-mobility-frontend.vercel.app","https://voltaris.rw"]'
 
-      # Optional Cloudflare R2 configuration.
+      # Cloudflare R2
       - key: R2_ACCOUNT_ID
         sync: false
 
