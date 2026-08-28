@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     #:
     #: "none" demands Secure, so it only works over HTTPS. The CSRF double-submit
     #: token carries the protection Lax was providing.
+    # Cross-site browser authentication:
+    # Vercel (*.vercel.app) -> Render (*.onrender.com) requires SameSite=None.
+    # Local development keeps Lax unless explicitly overridden.
     session_cookie_samesite: Literal["lax", "none", "strict"] = "lax"
 
     # --- Google sign-in ---------------------------------------------------
@@ -114,6 +117,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @model_validator(mode="after")
+    def _production_cookie_policy(self) -> Settings:
+        # Render API + Vercel frontend are cross-site.
+        # Never allow production to silently fall back to Lax.
+        if self.environment == "production" and self.session_cookie_samesite == "lax":
+            self.session_cookie_samesite = "none"
+        return self
 
     @model_validator(mode="after")
     def _refuse_insecure_production(self) -> Settings:
