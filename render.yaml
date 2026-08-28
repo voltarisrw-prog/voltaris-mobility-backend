@@ -20,7 +20,17 @@ services:
       - key: MONGODB_DATABASE
         value: voltaris
 
+<<<<<<< HEAD
       # One worker for Render's 512MB free tier.
+=======
+      # Frontend is on vercel.app while API is on onrender.com.
+      # They are cross-site, so browser session cookies require SameSite=None.
+      # SameSite=None automatically forces Secure in app/core/sessions.py.
+      - key: SESSION_COOKIE_SAMESITE
+        value: none
+
+      # One worker. See the note above and in the Dockerfile.
+>>>>>>> 371732f (changed mongodbURI)
       - key: WEB_CONCURRENCY
         value: "1"
 
