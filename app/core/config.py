@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     # Cross-site browser authentication:
     # Vercel (*.vercel.app) -> Render (*.onrender.com) requires SameSite=None.
     # Local development keeps Lax unless explicitly overridden.
-    session_cookie_samesite: Literal["lax", "none", "strict"] = "lax"
+    session_cookie_samesite: Literal["lax", "none", "strict"] = "none"
 
     # --- Google sign-in ---------------------------------------------------
     # Blank client id disables the feature: the endpoints return NOT_CONFIGURED
