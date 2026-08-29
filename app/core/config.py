@@ -64,9 +64,10 @@ class Settings(BaseSettings):
     # --- Google sign-in ---------------------------------------------------
     # Blank client id disables the feature: the endpoints return NOT_CONFIGURED
     # rather than pretending to work.
-    google_client_id: str = "mongodb+srv://voltarisrw_db_user:i1sDhybqWKY6fRSC@cluster0.gn8tuzc.mongodb.net/?appName=Cluster0"
-    google_client_secret: str = "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"
-    google_redirect_uri: str = "http://localhost:3000/auth/google/callback"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "https://voltaris-mobility-backend.onrender.com/api/v1/auth/google/callback"
+    frontend_url: str = "https://voltaris-mobility-frontend.vercel.app"
     google_jwks_url: str = "https://www.googleapis.com/oauth2/v3/certs"
     google_token_url: str = "https://oauth2.googleapis.com/token"
     google_authorize_url: str = "https://accounts.google.com/o/oauth2/v2/auth"

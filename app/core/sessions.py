@@ -79,9 +79,9 @@ def set_session_cookies(response: Response, *, access: str, refresh: str) -> str
 
 
 def clear_session_cookies(response: Response) -> None:
-    response.delete_cookie(SESSION_COOKIE, path="/")
-    response.delete_cookie(REFRESH_COOKIE, path=REFRESH_PATH)
-    response.delete_cookie(CSRF_COOKIE, path="/")
+    response.delete_cookie(SESSION_COOKIE, path="/", secure=get_settings().is_production, samesite=get_settings().session_cookie_samesite)
+    response.delete_cookie(REFRESH_COOKIE, path=REFRESH_PATH, secure=get_settings().is_production, samesite=get_settings().session_cookie_samesite)
+    response.delete_cookie(CSRF_COOKIE, path="/", secure=get_settings().is_production, samesite=get_settings().session_cookie_samesite)
 
 
 def extract_token(request: Request, authorization: str | None) -> tuple[str, bool]:

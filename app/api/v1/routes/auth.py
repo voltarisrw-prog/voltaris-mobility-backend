@@ -53,8 +53,12 @@ class SessionResponse(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    """Tokens are returned for API and mobile clients. Browsers ignore this body and
-    use the httpOnly cookies set alongside it."""
+    """
+    Authentication response.
+
+    Browser clients authenticate through httpOnly cookies. API/mobile clients
+    may additionally consume the token fields returned here.
+    """
 
     access_token: str
     refresh_token: str
@@ -173,17 +177,35 @@ async def google_authorize(service: AuthServiceDep) -> GoogleStartResponse:
     return GoogleStartResponse(**await service.begin_google(get_identity_provider()))
 
 
-@router.post("/google/callback", response_model=TokenResponse)
+@router.get("/google/callback")
 async def google_callback(
-    body: GoogleCallbackRequest,
+    code: str,
+    state: str,
     service: AuthServiceDep,
     request: Request,
     response: Response,
-) -> TokenResponse:
-    """Exchanges the code server-side, verifies the ID token against Google's JWKS,
-    then links to an existing account by provider subject or verified email — one
-    account per person, never a duplicate."""
+):
+    """Handle Google's browser redirect, create the session, then redirect
+    the browser back to the frontend callback page."""
+    from fastapi.responses import RedirectResponse
+    from app.core.config import get_settings
+
     result = await service.complete_google(
-        get_identity_provider(), code=body.code, state=body.state, ip=client_ip(request)
+        get_identity_provider(),
+        code=code,
+        state=state,
+        ip=client_ip(request),
     )
-    return _issue(response, result)
+
+    settings = get_settings()
+
+    redirect = settings.frontend_url.rstrip("/") + "/auth/google/callback"
+
+    redirect_response = RedirectResponse(
+        url=redirect,
+        status_code=303,
+    )
+
+    _issue(redirect_response, result)
+
+    return redirect_response
